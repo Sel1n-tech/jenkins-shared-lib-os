@@ -1,46 +1,34 @@
 // vars/buildMiniOs.groovy
+import common.OSFactory
+import common.products.BaseOS
 
 def call(Map config) {
-    def osConfigs = [
-        'ubuntu-24.04': [
-            baseImage: 'ubuntu:24.04',
-            description: 'Стандартная сборка Ubuntu Server',
-            buildTime: 5 // Имитация более долгой сборки для Ubuntu
-        ],
-        'alpine-3.18': [
-            baseImage: 'alpine:3.18',
-            description: 'Легковесная сборка Alpine Linux',
-            buildTime: 2 // Alpine собирается быстрее
-        ]
-    ]
-
-    def selectedOs = config.osType
-    if (!osConfigs.containsKey(selectedOs)) {
-        error("❌ Неизвестная ОС: '${selectedOs}'. Доступные: ${osConfigs.keySet().join(', ')}")
-    }
-
-    def buildInfo = osConfigs[selectedOs]
-    def fullImageName = "${config.imageName}:${config.releaseVersion}-${selectedOs}"
-
+    // Создаем объект ОС через фабрику
+    BaseOS os = OSFactory.createOS(config.osType, config)
+    
+    // Валидация
+    os.validate()
+    
     echo "🚀 =========================================="
-    echo "🚀 Начинаем Docker-сборку: ${selectedOs}"
-    echo "📌 Тэг образа: ${fullImageName}"
-    echo "📝 Описание: ${buildInfo.description}"
+    echo "🚀 Начинаем Docker-сборку: ${os.osType}"
+    echo "📌 Тэг образа: ${os.fullImageName}"
+    echo "📝 Описание: ${os.description}"
+    echo "📦 Базовый образ: ${os.baseImage}"
     echo "🚀 =========================================="
     
-    stage("Build Docker Image: ${selectedOs}") {
-        // Реальная команда сборки Docker!
-        // --build-arg передает переменную внутрь Dockerfile
-        sh "docker build --build-arg BASE_IMAGE=${buildInfo.baseImage} -t ${fullImageName} ."
+    stage("Build Docker Image: ${os.osType}") {
+        sh "docker build --build-arg BASE_IMAGE=${os.baseImage} -t ${os.fullImageName} ."
         
-        echo "⏳ Имитация дополнительных тестов образа (${buildInfo.buildTime} сек)..."
-        sh "sleep ${buildInfo.buildTime}"
+        echo "⏳ Имитация дополнительных тестов образа (${os.buildTime} сек)..."
+        sh "sleep ${os.buildTime}"
     }
 
     stage("Tag and Push (Simulation)") {
         echo "🏷️  Тэгирование образа для реестра..."
-        // Имитация push (в реальности здесь был бы docker push и использование с credentials)
-        sh "docker images | grep ${config.imageName}"
-        echo "✅ Образ ${fullImageName} успешно собран и готов к отправке в registry!"
+        sh "docker images | grep ${os.imageName}"
+        echo "✅ Образ ${os.fullImageName} успешно собран и готов к отправке в registry!"
     }
+    
+    // Возвращаем объект для дальнейшего использования (например, в оркестраторе)
+    return os
 }
